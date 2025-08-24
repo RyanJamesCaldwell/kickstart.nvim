@@ -99,6 +99,10 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
+-- Split window shortcuts
+vim.keymap.set('n', '<leader>-', '<cmd>split<cr>', { desc = 'Horizontal split' })
+vim.keymap.set('n', '<leader>|', '<cmd>vsplit<cr>', { desc = 'Vertical split' })
+
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
