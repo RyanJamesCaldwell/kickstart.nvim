@@ -1,26 +1,3 @@
---[[
-
-=====================================================================
-==================== READ THIS BEFORE CONTINUING ====================
-=====================================================================
-========                                    .-----.          ========
-========         .----------------------.   | === |          ========
-========         |.-""""""""""""""""""-.|   |-----|          ========
-========         ||                    ||   | === |          ========
-========         ||   KICKSTART.NVIM   ||   |-----|          ========
-========         ||                    ||   | === |          ========
-========         ||                    ||   |-----|          ========
-========         ||:Tutor              ||   |:::::|          ========
-========         |'-..................-'|   |____o|          ========
-========         `"")----------------(""`   ___________      ========
-========        /::::::::::|  |::::::::::\  \ no mouse \     ========
-========       /:::========|  |==hjkl==:::\  \ required \    ========
-========      '""""""""""""'  '""""""""""""'  '""""""""""'   ========
-========                                                     ========
-=====================================================================
-=====================================================================
---]]
-
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -144,6 +121,64 @@ vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left wind
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+
+-- Buffer navigation by ordinal number
+vim.keymap.set('n', '<leader>1', '<cmd>BufferLineGoToBuffer 1<cr>', { desc = 'Go to buffer 1' })
+vim.keymap.set('n', '<leader>2', '<cmd>BufferLineGoToBuffer 2<cr>', { desc = 'Go to buffer 2' })
+vim.keymap.set('n', '<leader>3', '<cmd>BufferLineGoToBuffer 3<cr>', { desc = 'Go to buffer 3' })
+vim.keymap.set('n', '<leader>4', '<cmd>BufferLineGoToBuffer 4<cr>', { desc = 'Go to buffer 4' })
+vim.keymap.set('n', '<leader>5', '<cmd>BufferLineGoToBuffer 5<cr>', { desc = 'Go to buffer 5' })
+vim.keymap.set('n', '<leader>6', '<cmd>BufferLineGoToBuffer 6<cr>', { desc = 'Go to buffer 6' })
+vim.keymap.set('n', '<leader>7', '<cmd>BufferLineGoToBuffer 7<cr>', { desc = 'Go to buffer 7' })
+vim.keymap.set('n', '<leader>8', '<cmd>BufferLineGoToBuffer 8<cr>', { desc = 'Go to buffer 8' })
+vim.keymap.set('n', '<leader>9', '<cmd>BufferLineGoToBuffer 9<cr>', { desc = 'Go to buffer 9' })
+
+-- Smart buffer delete function
+local function smart_buffer_delete(force)
+  local current_buf = vim.api.nvim_get_current_buf()
+  local buffers = vim.fn.getbufinfo({ buflisted = 1 })
+  
+  -- If this is the only buffer, create a new empty one
+  if #buffers <= 1 then
+    vim.cmd('enew')
+  else
+    -- Switch to previous buffer first
+    vim.cmd('bprevious')
+  end
+  
+  -- Now delete the original buffer
+  local cmd = force and 'bdelete!' or 'bdelete'
+  pcall(vim.cmd, cmd .. ' ' .. current_buf)
+end
+
+-- Buffer management keymaps
+vim.keymap.set('n', '<leader>bd', function() smart_buffer_delete(false) end, { desc = '[B]uffer [D]elete' })
+vim.keymap.set('n', '<leader>bD', function() smart_buffer_delete(true) end, { desc = '[B]uffer [D]elete (force)' })
+vim.keymap.set('n', '<leader>bn', '<cmd>bnext<cr>', { desc = '[B]uffer [N]ext' })
+vim.keymap.set('n', '<leader>bp', '<cmd>bprevious<cr>', { desc = '[B]uffer [P]revious' })
+vim.keymap.set('n', '<leader>bl', '<cmd>BufferLineCloseLeft<cr>', { desc = '[B]uffer close all to the [L]eft' })
+vim.keymap.set('n', '<leader>br', '<cmd>BufferLineCloseRight<cr>', { desc = '[B]uffer close all to the [R]ight' })
+vim.keymap.set('n', '<leader>bo', '<cmd>BufferLineCloseOthers<cr>', { desc = '[B]uffer close all [O]thers' })
+vim.keymap.set('n', '<leader>bh', '<cmd>BufferLineMovePrev<cr>', { desc = '[B]uffer move left ([H])' })
+vim.keymap.set('n', '<leader>bl', '<cmd>BufferLineMoveNext<cr>', { desc = '[B]uffer move right ([L])' })
+vim.keymap.set('n', '<leader>bp', '<cmd>BufferLineTogglePin<cr>', { desc = '[B]uffer toggle [P]in' })
+
+-- File explorer
+vim.keymap.set('n', '<leader>e', '<cmd>Neotree toggle<cr>', { desc = 'Toggle file [E]xplorer' })
+vim.keymap.set('n', '<leader>E', '<cmd>Neotree focus<cr>', { desc = 'Focus file [E]xplorer' })
+
+-- Terminal
+vim.keymap.set('n', '<leader>ft', '<cmd>ToggleTerm<cr>', { desc = '[F]loating [T]erminal' })
+vim.keymap.set('n', '<C-/>', '<cmd>ToggleTerm<cr>', { desc = 'Toggle terminal' })
+vim.keymap.set('t', '<C-/>', '<cmd>ToggleTerm<cr>', { desc = 'Toggle terminal' })
+
+-- Better indenting (stay in visual mode)
+vim.keymap.set('v', '<', '<gv', { desc = 'Unindent' })
+vim.keymap.set('v', '>', '>gv', { desc = 'Indent' })
+
+-- Quit keymaps
+vim.keymap.set('n', '<leader>qq', '<cmd>qa<cr>', { desc = '[Q]uit all' })
+vim.keymap.set('n', '<leader>qQ', '<cmd>qa!<cr>', { desc = '[Q]uit all (force)' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -481,8 +516,7 @@ require('lazy').setup({
             vim.keymap.set(mode, keys, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
           end
 
-          -- quit
-          map('<leader>qq', '<cmd>qa<cr>', 'Quit All')
+          -- LSP quit (remove this conflicting mapping)
 
           -- Rename the variable under your cursor.
           --  Most Language Servers support renaming across files, etc.
@@ -573,15 +607,15 @@ require('lazy').setup({
             end, '[T]oggle Inlay [H]ints')
           end
 
-          -- HERE IT IS
-          vim.api.nvim_create_autocmd('CursorHold', {
-            buffer = event.buf,
-            callback = function()
-              if #vim.lsp.get_clients { bufnr = event.buf } > 0 then
+          -- Hover on cursor hold (with proper capability check)
+          if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_hover, event.buf) then
+            vim.api.nvim_create_autocmd('CursorHold', {
+              buffer = event.buf,
+              callback = function()
                 pcall(vim.lsp.buf.hover)
-              end
-            end,
-          })
+              end,
+            })
+          end
         end,
       })
 
@@ -998,6 +1032,66 @@ require('lazy').setup({
     ft = { 'go', 'gomod' },
     build = ':lua require("go.install").update_all_sync()', -- if you need to install/update all binaries
   },
+  {
+    'nvimdev/dashboard-nvim',
+    event = 'VimEnter',
+    config = function()
+      require('dashboard').setup {
+        theme = 'hyper',
+        config = {
+          week_header = {
+            enable = true,
+          },
+        },
+      }
+    end,
+    dependencies = { { 'nvim-tree/nvim-web-devicons' } },
+  },
+  { 'tpope/vim-fugitive' },
+  { 'tpope/vim-rails' },
+  { 'tpope/vim-rhubarb' },
+  {
+    'nvim-neo-tree/neo-tree.nvim',
+    branch = 'v3.x',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'MunifTanjim/nui.nvim',
+      'nvim-tree/nvim-web-devicons', -- optional, but recommended
+    },
+    lazy = false, -- neo-tree will lazily load itself
+  },
+  {
+    'akinsho/toggleterm.nvim',
+    version = '*',
+    opts = {
+      direction = 'float',
+      auto_scroll = true,
+      float_opts = {
+        border = 'curved',
+        winblend = 0,
+      },
+    },
+  },
+  {
+    'akinsho/bufferline.nvim',
+    version = '*',
+    dependencies = 'nvim-tree/nvim-web-devicons',
+    opts = {
+      options = {
+        diagnostics = 'nvim_lsp',
+        separator_style = 'slant',
+        numbers = 'ordinal',
+        offsets = {
+          {
+            filetype = 'neo-tree',
+            text = 'File Explorer',
+            text_align = 'left',
+            separator = true,
+          },
+        },
+      },
+    },
+  },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
@@ -1012,7 +1106,7 @@ require('lazy').setup({
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
-  require 'kickstart.plugins.neo-tree',
+  -- require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
