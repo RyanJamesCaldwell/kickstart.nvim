@@ -1041,22 +1041,11 @@ require('lazy').setup({
     build = ':lua require("go.install").update_all_sync()', -- if you need to install/update all binaries
   },
   {
-    'nvimdev/dashboard-nvim',
-    event = 'VimEnter',
-    config = function()
-      require('dashboard').setup {
-        theme = 'hyper',
-        -- config = {
-        --   week_header = {
-        --     enable = true,
-        --   },
-        -- },
-        config = {
-          header = GrimReaper,
-        },
-      }
-    end,
-    dependencies = { { 'nvim-tree/nvim-web-devicons' } },
+    'folke/snacks.nvim',
+    ---@type snacks.Config
+    opts = {
+      dashboard = {},
+    },
   },
   { 'tpope/vim-fugitive' },
   { 'tpope/vim-rails' },
