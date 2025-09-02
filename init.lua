@@ -1152,15 +1152,74 @@ require('lazy').setup({
     priority = 1000,
     lazy = false,
     config = function()
-      require('snacks').setup({
+      require('snacks').setup {
         dashboard = {
           enabled = true,
+          sections = {
+            { section = 'header' },
+            {
+              icon = ' ',
+              section = 'terminal',
+              enabled = function()
+                return Snacks.git.get_root() ~= nil
+              end,
+              -- cmd = 'git status --porcelain -b && echo "" && git --no-pager diff --stat',
+              cmd = 'git status --short --branch --renames',
+              height = 10,
+              padding = 1,
+              indent = 2,
+            },
+            {
+              section = 'keys',
+              gap = 1,
+              padding = 1,
+              keys = {
+                {
+                  icon = ' ',
+                  key = 'g',
+                  desc = 'Pull Requests',
+                  action = function()
+                    vim.fn.system 'open https://github.com/pulls'
+                  end,
+                },
+                { icon = ' ', key = 'r', desc = 'Recent Files', action = ":lua Snacks.dashboard.pick('oldfiles')" },
+                { icon = ' ', key = 'c', desc = 'Config', action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
+                { icon = '󰒲 ', key = 'L', desc = 'Lazy', action = ':Lazy', enabled = package.loaded.lazy ~= nil },
+                {
+                  icon = ' ',
+                  key = 'q',
+                  desc = 'Quit',
+                  action = ':qa',
+                },
+              },
+            },
+          },
           preset = {
             header = table.concat(Hydra, '\n'),
+            keys = {
+              {
+                icon = ' ',
+                key = 'g',
+                desc = 'Pull Requests',
+                action = function()
+                  vim.fn.system 'open https://github.com/pulls'
+                end,
+              },
+              { icon = ' ', key = 'r', desc = 'Recent Files', action = ":lua Snacks.dashboard.pick('oldfiles')" },
+              { icon = ' ', key = 'c', desc = 'Config', action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
+              -- { icon = ' ', key = 's', desc = 'Restore Session', section = 'session' },
+              { icon = '󰒲 ', key = 'L', desc = 'Lazy', action = ':Lazy', enabled = package.loaded.lazy ~= nil },
+              {
+                icon = ' ',
+                key = 'q',
+                desc = 'Quit',
+                action = ':qa',
+              },
+            },
           },
         },
         zen = { enabled = true },
-      })
+      }
     end,
     keys = {
       {
@@ -1273,6 +1332,23 @@ require('lazy').setup({
       lazy = '💤 ',
     },
   },
+})
+
+-- Open neo-tree when entering a real file buffer (not dashboard)
+vim.api.nvim_create_autocmd('BufEnter', {
+  callback = function()
+    local bufname = vim.api.nvim_buf_get_name(0)
+    local buftype = vim.bo.buftype
+    
+    -- Only open neo-tree if:
+    -- 1. Buffer has a real file name (not empty)
+    -- 2. Buffer type is empty (normal file, not special buffer)
+    -- 3. Neo-tree isn't already open
+    if bufname ~= '' and buftype == '' and not vim.g.neotree_opened then
+      vim.cmd('Neotree show')
+      vim.g.neotree_opened = true
+    end
+  end,
 })
 
 -- The line beneath this is called `modeline`. See `:help modeline`
