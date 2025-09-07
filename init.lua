@@ -5,6 +5,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 local orig = vim.lsp.util.open_floating_preview
+---@diagnostic disable-next-line: duplicate-set-field
 vim.lsp.util.open_floating_preview = function(contents, syntax, opts, ...)
   opts = opts or {}
   opts.enter = false
@@ -88,6 +89,9 @@ vim.o.scrolloff = 10
 -- instead raise a dialog asking if you wish to save the current file(s)
 -- See `:help 'confirm'`
 vim.o.confirm = true
+vim.o.wrap = false -- don't wrap lines
+vim.o.swapfile = false -- No swap files
+vim.o.backup = false -- No backup files
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -142,17 +146,17 @@ local function smart_buffer_delete(force)
   local current_buf = vim.api.nvim_get_current_buf()
   local buffers = vim.fn.getbufinfo { buflisted = 1 }
 
-  -- If this is the only buffer, create a new empty one
+  -- If this is the only buffer, just delete it and let vim handle it naturally
   if #buffers <= 1 then
-    vim.cmd 'enew'
+    local cmd = force and 'bdelete!' or 'bdelete'
+    pcall(vim.cmd, cmd .. ' ' .. current_buf)
   else
     -- Switch to previous buffer first
     vim.cmd 'bprevious'
+    -- Now delete the original buffer
+    local cmd = force and 'bdelete!' or 'bdelete'
+    pcall(vim.cmd, cmd .. ' ' .. current_buf)
   end
-
-  -- Now delete the original buffer
-  local cmd = force and 'bdelete!' or 'bdelete'
-  pcall(vim.cmd, cmd .. ' ' .. current_buf)
 end
 
 -- Buffer management keymaps
@@ -373,7 +377,7 @@ require('lazy').setup({
       signs = {
         add = { text = '+' },
         change = { text = '~' },
-        delete = { text = '_' },
+        delete = { text = '-' },
         topdelete = { text = '‾' },
         changedelete = { text = '~' },
       },
@@ -555,6 +559,11 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sn', function()
         builtin.find_files { cwd = vim.fn.stdpath 'config' }
       end, { desc = '[S]earch [N]eovim files' })
+
+      -- Session management
+      vim.keymap.set('n', '<leader>sp', function()
+        require('persistence').select()
+      end, { desc = '[S]earch [P]rojects (sessions)' })
     end,
   },
 
@@ -1066,6 +1075,34 @@ require('lazy').setup({
         return '%2l:%-2v'
       end
 
+      ---@diagnostic disable-next-line: duplicate-set-field
+      statusline.section_diagnostics = function()
+        local diagnostics = vim.diagnostic.get(0)
+        local errors = 0
+        local warnings = 0
+        for _, d in ipairs(diagnostics) do
+          if d.severity == vim.diagnostic.severity.ERROR then
+            errors = errors + 1
+          elseif d.severity == vim.diagnostic.severity.WARN then
+            warnings = warnings + 1
+          end
+        end
+        local result = {}
+        if errors > 0 then
+          table.insert(result, ' ' .. errors)
+        end
+        if warnings > 0 then
+          table.insert(result, ' ' .. warnings)
+        end
+        return table.concat(result, ' ')
+      end
+
+      -- Hide file format/encoding info (the ++ symbols)
+      ---@diagnostic disable-next-line: duplicate-set-field
+      statusline.section_fileinfo = function()
+        return ''
+      end
+
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
@@ -1076,7 +1113,7 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'regex', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -1104,21 +1141,39 @@ require('lazy').setup({
     build = 'make tiktoken', -- Only on MacOS or Linux
     opts = {
       -- See Configuration section for options
+      model = 'claude-opus-4.1', -- AI model to use
+      temperature = 0.1, -- Lower = focused, higher = creative
+      window = {
+        layout = 'vertical', -- 'vertical', 'horizontal', 'float'
+        width = 0.5, -- 50% of screen width
+      },
+      auto_insert_mode = true, -- Enter insert mode when opening
     },
     -- See Commands section for default commands if you want to lazy load on them
   },
+  -- {
+  --   'catppuccin/nvim',
+  --   name = 'catppuccin',
+  --   priority = 1000,
+  --   config = function()
+  --     -- Load the Catppuccin colorscheme
+  --     -- You can change the flavor to 'mocha', 'frappe', 'macchiato', or 'latte'
+  --     require('catppuccin').setup {
+  --       float = {
+  --         transparent = false,
+  --         solid = true,
+  --       },
+  --       transparent_background = false, -- Set to false if you want a solid background
+  --       term_colors = true, -- Set to false if you don't want terminal colors
+  --     }
+  --     vim.cmd.colorscheme 'catppuccin'
+  --   end,
+  -- },
   {
-    'catppuccin/nvim',
-    name = 'catppuccin',
-    priority = 1000,
+    'rose-pine/neovim',
+    name = 'rose-pine',
     config = function()
-      -- Load the Catppuccin colorscheme
-      -- You can change the flavor to 'mocha', 'frappe', 'macchiato', or 'latte'
-      require('catppuccin').setup {
-        transparent_background = false, -- Set to false if you want a solid background
-        term_colors = true, -- Set to false if you don't want terminal colors
-      }
-      vim.cmd.colorscheme 'catppuccin'
+      vim.cmd 'colorscheme rose-pine'
     end,
   },
   {
@@ -1152,6 +1207,23 @@ require('lazy').setup({
     priority = 1000,
     lazy = false,
     config = function()
+      -- Auto-open dashboard when closing last buffer
+      vim.api.nvim_create_autocmd('BufDelete', {
+        group = vim.api.nvim_create_augroup('dashboard_on_close', { clear = true }),
+        callback = function()
+          vim.schedule(function()
+            local buffers = vim.fn.getbufinfo { buflisted = 1 }
+            local real_buffers = {}
+
+            -- Filter out special buffers
+            for _, buf in ipairs(buffers) do
+              if buf.name ~= '' and not vim.startswith(buf.name, 'term://') then
+                table.insert(real_buffers, buf)
+              end
+            end
+          end)
+        end,
+      })
       require('snacks').setup {
         dashboard = {
           enabled = true,
@@ -1207,7 +1279,7 @@ require('lazy').setup({
               },
               { icon = ' ', key = 'r', desc = 'Recent Files', action = ":lua Snacks.dashboard.pick('oldfiles')" },
               { icon = ' ', key = 'c', desc = 'Config', action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
-              -- { icon = ' ', key = 's', desc = 'Restore Session', section = 'session' },
+              { icon = ' ', key = 's', desc = 'Restore Session', action = ":lua require('persistence').select()" },
               { icon = '󰒲 ', key = 'L', desc = 'Lazy', action = ':Lazy', enabled = package.loaded.lazy ~= nil },
               {
                 icon = ' ',
@@ -1232,7 +1304,7 @@ require('lazy').setup({
     },
   },
   { 'tpope/vim-fugitive' },
-  { 'tpope/vim-rails' },
+  -- { 'tpope/vim-rails' },
   { 'tpope/vim-rhubarb' },
   {
     'nvim-neo-tree/neo-tree.nvim',
@@ -1285,6 +1357,114 @@ require('lazy').setup({
       },
     },
   },
+  {
+    'folke/noice.nvim',
+    event = 'VeryLazy',
+    opts = {
+      -- add any options here
+    },
+    dependencies = {
+      -- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
+      'MunifTanjim/nui.nvim',
+      -- OPTIONAL:
+      --   `nvim-notify` is only needed, if you want to use the notification view.
+      --   If not available, we use `mini` as the fallback
+      'rcarriga/nvim-notify',
+    },
+    config = function()
+      require('noice').setup {
+        routes = {
+          {
+            filter = {
+              event = 'notify',
+              find = 'No information available',
+            },
+            opts = { skip = true },
+          },
+        },
+        lsp = {
+          -- override markdown rendering so that **cmp** and other plugins use **Treesitter**
+          override = {
+            ['vim.lsp.util.convert_input_to_markdown_lines'] = true,
+            ['vim.lsp.util.stylize_markdown'] = true,
+            ['cmp.entry.get_documentation'] = true,
+          },
+        },
+        presets = {
+          -- you can enable a preset by setting it to true, or a table that will override the preset config
+          -- you can also add custom presets that you can enable/disable with enabled=true
+          bottom_search = false, -- use a classic bottom cmdline for search
+          command_palette = true, -- position the cmdline and popupmenu together
+          long_message_to_split = false, -- long messages will be sent to a split
+          inc_rename = false, -- enables an input dialog for inc-rename.nvim
+        },
+      }
+    end,
+  },
+  {
+    'folke/trouble.nvim',
+    opts = {
+      auto_jump = true,
+      focus = true,
+      pinned = true,
+    }, -- for default options, refer to the configuration section for custom setup.
+    cmd = 'Trouble',
+    keys = {},
+  },
+  {
+    'folke/persistence.nvim',
+    event = 'BufReadPre',
+    opts = {
+      options = vim.opt.sessionoptions:get(), -- use current sessionoptions
+    },
+    config = function(_, opts)
+      -- Configure sessionoptions to exclude problematic buffers
+      vim.opt.sessionoptions = {
+        'blank',
+        'buffers',
+        'curdir',
+        'folds',
+        'help',
+        'tabpages',
+        'winsize',
+        'winpos',
+        'terminal',
+      }
+
+      require('persistence').setup(opts)
+
+      -- Proper autocmd setup for neo-tree integration
+      local group = vim.api.nvim_create_augroup('persistence-neo-tree', { clear = true })
+
+      vim.api.nvim_create_autocmd('User', {
+        group = group,
+        pattern = 'PersistenceSavePre',
+        callback = function()
+          pcall(vim.cmd, 'Neotree close')
+        end,
+      })
+
+      vim.api.nvim_create_autocmd('User', {
+        group = group,
+        pattern = 'PersistenceLoadPre',
+        callback = function()
+          -- Save current session and close all buffers before loading new one
+          require('persistence').save()
+          vim.cmd 'silent %bd!'
+        end,
+      })
+
+      vim.api.nvim_create_autocmd('User', {
+        group = group,
+        pattern = 'PersistenceLoadPost',
+        callback = function()
+          vim.schedule(function()
+            pcall(vim.cmd, 'Neotree show')
+          end)
+        end,
+      })
+    end,
+  },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
@@ -1295,11 +1475,10 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
@@ -1332,23 +1511,6 @@ require('lazy').setup({
       lazy = '💤 ',
     },
   },
-})
-
--- Open neo-tree when entering a real file buffer (not dashboard)
-vim.api.nvim_create_autocmd('BufEnter', {
-  callback = function()
-    local bufname = vim.api.nvim_buf_get_name(0)
-    local buftype = vim.bo.buftype
-    
-    -- Only open neo-tree if:
-    -- 1. Buffer has a real file name (not empty)
-    -- 2. Buffer type is empty (normal file, not special buffer)
-    -- 3. Neo-tree isn't already open
-    if bufname ~= '' and buftype == '' and not vim.g.neotree_opened then
-      vim.cmd('Neotree show')
-      vim.g.neotree_opened = true
-    end
-  end,
 })
 
 -- The line beneath this is called `modeline`. See `:help modeline`
