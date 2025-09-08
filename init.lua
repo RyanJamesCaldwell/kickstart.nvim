@@ -55,8 +55,8 @@ vim.o.smartcase = true
 -- Keep signcolumn on by default
 vim.o.signcolumn = 'yes'
 
--- Decrease update time
-vim.o.updatetime = 1000
+-- Decrease update time (increased to reduce LSP overhead)
+vim.o.updatetime = 3000
 
 -- Decrease mapped sequence wait time
 vim.o.timeoutlen = 300
@@ -191,6 +191,26 @@ vim.keymap.set('v', '>', '>gv', { desc = 'Indent' })
 -- Quit keymaps
 vim.keymap.set('n', '<leader>qq', '<cmd>qa<cr>', { desc = '[Q]uit all' })
 vim.keymap.set('n', '<leader>qQ', '<cmd>qa!<cr>', { desc = '[Q]uit all (force)' })
+
+-- Simple and effective
+vim.keymap.set('n', '<leader>gf', function()
+  local lines = vim.fn.systemlist 'git status --porcelain'
+  local files = {}
+
+  for _, line in ipairs(lines) do
+    if line ~= '' then
+      local file = line:sub(4) -- Remove git status prefix
+      table.insert(files, vim.fn.fnameescape(file))
+    end
+  end
+
+  if #files > 0 then
+    vim.cmd('args ' .. table.concat(files, ' '))
+    print('Loaded ' .. #files .. ' modified files')
+  else
+    print 'No modified files found'
+  end
+end, { desc = 'Open all git modified files' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -731,15 +751,15 @@ require('lazy').setup({
             end, '[T]oggle Inlay [H]ints')
           end
 
-          -- Hover on cursor hold (with proper capability check)
-          if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_hover, event.buf) then
-            vim.api.nvim_create_autocmd('CursorHold', {
-              buffer = event.buf,
-              callback = function()
-                pcall(vim.lsp.buf.hover)
-              end,
-            })
-          end
+          -- Hover on cursor hold (with proper capability check) - DISABLED for performance
+          -- if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_hover, event.buf) then
+          --   vim.api.nvim_create_autocmd('CursorHold', {
+          --     buffer = event.buf,
+          --     callback = function()
+          --       pcall(vim.lsp.buf.hover)
+          --     end,
+          --   })
+          -- end
         end,
       })
 
@@ -788,32 +808,33 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        gopls = {
-          settings = {
-            gopls = {
-              hoverKind = 'FullDocumentation',
-              completeUnimported = true,
-              linksInHover = true,
-
-              hints = {
-                assignVariableTypes = true,
-                compositeLiteralFields = true,
-                constantValues = true,
-                functionTypeParameters = true,
-                parameterNames = true,
-                rangeVariableTypes = true,
-              },
-
-              analyses = {
-                unusedparams = true,
-                unreachable = true,
-                nilness = true,
-                shadow = true,
-              },
-            },
-          },
-          filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
-        },
+        -- Remove gopls from here since go.nvim handles it
+        -- gopls = {
+        --   settings = {
+        --     gopls = {
+        --       hoverKind = 'FullDocumentation',
+        --       completeUnimported = true,
+        --       linksInHover = true,
+        --
+        --       hints = {
+        --         assignVariableTypes = true,
+        --         compositeLiteralFields = true,
+        --         constantValues = true,
+        --         functionTypeParameters = true,
+        --         parameterNames = true,
+        --         rangeVariableTypes = true,
+        --       },
+        --
+        --       analyses = {
+        --         unusedparams = true,
+        --         unreachable = true,
+        --         nilness = true,
+        --         shadow = true,
+        --       },
+        --     },
+        --   },
+        --   filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
+        -- },
         -- pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
@@ -1184,10 +1205,38 @@ require('lazy').setup({
       'nvim-treesitter/nvim-treesitter',
     },
     opts = {
-      -- lsp_keymaps = false,
-      -- other options
+      -- Reduce memory usage
+      lsp_document_formatting = true, -- go.nvim handles formatting via goimports
+      lsp_inlay_hints = {
+        enable = false, -- Disable inlay hints to reduce memory
+      },
     },
     config = function(lp, opts)
+      -- Configure go.nvim with proper LSP capabilities
+      opts.lsp_cfg = {
+        capabilities = require('blink.cmp').get_lsp_capabilities(),
+        settings = {
+          gopls = {
+            analyses = {
+              unreachable = true,
+              nilness = true,
+              unusedparams = true,
+              useany = true,
+            },
+            codelenses = {
+              gc_details = false,
+              generate = true,
+              test = true,
+              tidy = true,
+            },
+            experimentalPostfixCompletions = true,
+            gofumpt = true,
+            staticcheck = true,
+            usePlaceholders = true,
+          },
+        },
+      }
+
       require('go').setup(opts)
       local format_sync_grp = vim.api.nvim_create_augroup('GoFormat', {})
       vim.api.nvim_create_autocmd('BufWritePre', {
@@ -1317,6 +1366,11 @@ require('lazy').setup({
     lazy = false, -- neo-tree will lazily load itself
     opts = {
       filesystem = {
+        follow_current_file = {
+          enabled = true, -- This will find and focus the file in the active buffer every time
+          leave_dirs_open = true, -- `false` closes auto expanded dirs, such as with `:Neotree reveal`
+        },
+        hijack_netrw_behavior = 'open_default', -- netrw disabled, opening a directory opens neo-tree
         filtered_items = {
           visible = true,
           hide_dotfiles = false,
