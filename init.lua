@@ -17,6 +17,9 @@ end
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
+-- Ensure bufferline is shown
+vim.o.showtabline = 2  -- Always show tabline/bufferline
+
 -- [[ Setting options ]]
 -- See `:help vim.o`
 -- NOTE: You can change these options as you wish!
@@ -180,9 +183,21 @@ vim.keymap.set('n', '<leader>e', '<cmd>Neotree toggle<cr>', { desc = 'Toggle fil
 vim.keymap.set('n', '<leader>E', '<cmd>Neotree focus<cr>', { desc = 'Focus file [E]xplorer' })
 
 -- Terminal
-vim.keymap.set('n', '<leader>ft', '<cmd>ToggleTerm<cr>', { desc = '[F]loating [T]erminal' })
+vim.keymap.set('n', '<leader>ft', '<cmd>ToggleTerm direction=float<cr>', { desc = '[F]loating [T]erminal' })
+vim.keymap.set('n', '<leader>tv', '<cmd>ToggleTerm direction=vertical<cr>', { desc = '[T]erminal [V]ertical split' })
+vim.keymap.set('n', '<leader>th', '<cmd>ToggleTerm direction=horizontal<cr>', { desc = '[T]erminal [H]orizontal split' })
 vim.keymap.set('n', '<C-/>', '<cmd>ToggleTerm<cr>', { desc = 'Toggle terminal' })
 vim.keymap.set('t', '<C-/>', '<cmd>ToggleTerm<cr>', { desc = 'Toggle terminal' })
+
+-- Copilot terminal keymaps
+vim.keymap.set('n', '<leader>tc', function()
+  -- Open a vertical terminal and run copilot command
+  vim.cmd('ToggleTerm direction=vertical')
+  vim.defer_fn(function()
+    -- Send the copilot command to the terminal
+    vim.api.nvim_feedkeys('icopilot\n', 'n', false)
+  end, 100)
+end, { desc = '[T]erminal [C]opilot' })
 
 -- Better indenting (stay in visual mode)
 vim.keymap.set('v', '<', '<gv', { desc = 'Unindent' })
@@ -918,7 +933,8 @@ require('lazy').setup({
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
+        -- Go is handled by go.nvim to avoid race conditions
+        local disable_filetypes = { c = true, cpp = true, go = true }
         if disable_filetypes[vim.bo[bufnr].filetype] then
           return nil
         else
@@ -1383,8 +1399,17 @@ require('lazy').setup({
     'akinsho/toggleterm.nvim',
     version = '*',
     opts = {
-      direction = 'float',
+      direction = 'vertical',
+      size = function(term)
+        if term.direction == "horizontal" then
+          return 15
+        elseif term.direction == "vertical" then
+          return vim.o.columns * 0.4  -- 40% of screen width
+        end
+      end,
       auto_scroll = true,
+      open_mapping = [[<C-\>]],  -- Ctrl+\ to toggle
+      -- Keep float opts for when you want to use floating terminals
       float_opts = {
         border = 'curved',
         winblend = 0,
@@ -1395,21 +1420,29 @@ require('lazy').setup({
     'akinsho/bufferline.nvim',
     version = '*',
     dependencies = 'nvim-tree/nvim-web-devicons',
-    opts = {
-      options = {
-        diagnostics = 'nvim_lsp',
-        separator_style = 'slant',
-        numbers = 'ordinal',
-        offsets = {
-          {
-            filetype = 'neo-tree',
-            text = 'File Explorer',
-            text_align = 'left',
-            separator = true,
+    config = function()
+      require('bufferline').setup({
+        options = {
+          mode = 'buffers', -- explicitly set to buffers mode
+          diagnostics = 'nvim_lsp',
+          separator_style = 'slant',
+          numbers = 'ordinal',
+          show_buffer_close_icons = true,
+          show_close_icon = true,
+          show_tab_indicators = true,
+          persist_buffer_sort = true,
+          offsets = {
+            {
+              filetype = 'neo-tree',
+              text = 'File Explorer',
+              text_align = 'left',
+              separator = true,
+            },
           },
+          always_show_bufferline = true, -- force bufferline to always show
         },
-      },
-    },
+      })
+    end,
   },
   {
     'folke/noice.nvim',
